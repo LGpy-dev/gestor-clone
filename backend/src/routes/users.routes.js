@@ -11,6 +11,20 @@ function isValidEmail(value) {
   return emailRegex.test(String(value ?? '').trim());
 }
 
+function normalizeBgPublications(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .map((item) => ({
+      date: String(item?.date ?? '').trim(),
+      bulletin: String(item?.bulletin ?? '').trim(),
+      publication: String(item?.publication ?? '').trim()
+    }))
+    .filter((item) => item.date || item.bulletin || item.publication);
+}
+
 router.get('/', auth, permit('super', 'adm', 'user'), async (req, res) => {
   const query = req.user.role === 'user'
     ? { _id: req.user.id, role: { $ne: 'super' } }
@@ -126,6 +140,35 @@ router.put('/:id', auth, permit('super', 'adm'), async (req, res) => {
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao atualizar usuario', error: error.message });
+  }
+});
+
+router.put('/:id/bg-publications', auth, permit('super', 'adm'), async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Usuario nao encontrado' });
+    }
+
+    if (targetUser.role === 'super') {
+      return res.status(403).json({ message: 'Usuario super nao pode ser alterado pelo CRUD' });
+    }
+
+    const bgPublications = normalizeBgPublications(req.body?.bgPublications);
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { bgPublications },
+      { new: true }
+    ).select('-passwordHash');
+
+    res.json({
+      id: user._id,
+      bgPublications: user.bgPublications
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao atualizar publicacoes de BG', error: error.message });
   }
 });
 

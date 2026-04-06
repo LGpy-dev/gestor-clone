@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import ConsultPeoplePage from './pages/ConsultPeoplePage';
+import PersonProfilePage from './pages/PersonProfilePage';
 import UsersPage from './pages/UsersPage';
 import ClientsPage from './pages/ClientsPage';
 import ProductsPage from './pages/ProductsPage';
@@ -24,9 +26,27 @@ export default function App() {
         />
 
         <Route
+          path="/consultar-pessoas"
+          element={
+            <ProtectedRoute roles={['super', 'adm', 'user']}>
+              <ConsultPeoplePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/consultar-pessoas/:personCpf"
+          element={
+            <ProtectedRoute roles={['super', 'adm', 'user']}>
+              <PersonProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/users"
           element={
-            <ProtectedRoute roles={['super', 'user']}>
+            <ProtectedRoute roles={['super', 'adm', 'user']}>
               <UsersPage />
             </ProtectedRoute>
           }

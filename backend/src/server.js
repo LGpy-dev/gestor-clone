@@ -59,6 +59,21 @@ app.use('/api/clients', clientsRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
+app.use((req, res) => {
+  res.status(404).json({ message: 'Rota nao encontrada' });
+});
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) {
+    return next(error);
+  }
+
+  const status = error?.status || error?.statusCode || 500;
+  const message = error?.message || 'Erro interno do servidor';
+
+  res.status(status).json({ message });
+});
+
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {

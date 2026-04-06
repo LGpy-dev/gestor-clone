@@ -1,53 +1,70 @@
-import { useEffect, useState } from 'react';
-import { Card } from 'primereact/card';
-import AppMenu from '../components/AppMenu';
-import { request } from '../services/api';
+import GestorPortalLayout from '../components/GestorPortalLayout';
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState({ users: 0, clients: 0, products: 0 });
-
-  useEffect(() => {
-    request('/dashboard').then(setStats).catch(console.error);
-  }, []);
-
   return (
-    <div className="page">
-      <AppMenu />
+    <GestorPortalLayout>
+      <div className="gestor-dashboard-metrics">
+        <article className="gestor-dashboard-card mission">
+          <header>MISSAO</header>
+          <div className="gestor-dashboard-card-body gestor-dashboard-card-body-mission">
+            <div className="gestor-bars-icon" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        </article>
 
-      <div className="page-content">
-        <section className="stats-hero gestor-hero">
-          <div className="gestor-hero-kicker">Painel operacional PMPA</div>
-          <h1>Gestor Web</h1>
-          <p>
-            Acompanhe usuarios, bases cadastradas e registros mockados em um unico
-            painel para demonstracao do ambiente administrativo.
-          </p>
-          <div className="hero-meta">
-            <span className="hero-pill">Acesso por perfil</span>
-            <span className="hero-pill">Dados mockados em MongoDB</span>
+        <article className="gestor-dashboard-card service">
+          <header>Tempo de Servico</header>
+          <div className="gestor-dashboard-card-body">
+            <p>Efetivo Servico:</p>
+          </div>
+        </article>
+
+        <article className="gestor-dashboard-card extra">
+          <header>Extraordinario</header>
+          <div className="gestor-dashboard-card-body">
+            <p>Voce tirou Extraordinarios referente ao Mes Atual</p>
+          </div>
+        </article>
+      </div>
+
+      <div className="gestor-dashboard-panels">
+        <section className="gestor-dashboard-panel">
+          <header>Informacoes funcional</header>
+          <div className="gestor-dashboard-panel-body gestor-dashboard-functional">
+            <div className="gestor-dashboard-functional-row">
+              <span>SITUACAO FUNCIONAL</span>
+              <strong>PRONTO PARA EXERCICIO DAS ATRIBUICOES</strong>
+            </div>
+
+            <div className="gestor-dashboard-functional-row">
+              <span>COMPORTAMENTO DISCIPLINAR</span>
+              <strong />
+            </div>
+
+            <div className="gestor-dashboard-functional-row">
+              <span>SETOR DE ATIVIDADE NA UNIDADE</span>
+              <strong>SECAO DE ADMINISTRACAO TECNOLOGICA</strong>
+            </div>
+
+            <div className="gestor-dashboard-functional-row">
+              <span>FUNCAO DE ATIVIDADE NA UNIDADE</span>
+              <strong>VOLUNTARIO CIVIL (DITEL)</strong>
+            </div>
           </div>
         </section>
 
-        <div className="grid-cards">
-          <div className="stat-card">
-            <Card title="Usuarios">
-              <h2 className="stat-value">{stats.users}</h2>
-            </Card>
+        <section className="gestor-dashboard-panel">
+          <header>Diarias Pendentes</header>
+          <div className="gestor-dashboard-panel-body gestor-dashboard-pending">
+            <p>Parabens, voce nao possui nenhuma pendencia no SIAFE.</p>
           </div>
-
-          <div className="stat-card">
-            <Card title="Clientes">
-              <h2 className="stat-value">{stats.clients}</h2>
-            </Card>
-          </div>
-
-          <div className="stat-card">
-            <Card title="Registros">
-              <h2 className="stat-value">{stats.products}</h2>
-            </Card>
-          </div>
-        </div>
+        </section>
       </div>
-    </div>
+    </GestorPortalLayout>
   );
 }

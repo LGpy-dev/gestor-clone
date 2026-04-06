@@ -17,9 +17,24 @@ export async function request(path, options = {}) {
   }
 
   const contentType = response.headers.get('content-type') || '';
-  const data = contentType.includes('application/json')
-    ? await response.json()
-    : { message: 'Resposta invalida do servidor.' };
+  let data;
+
+  if (contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    const rawText = await response.text();
+    const text = rawText.trim();
+
+    if (response.status === 404) {
+      data = { message: 'A rota solicitada nao foi encontrada no backend. Verifique se a API publicada foi atualizada.' };
+    } else if (response.status >= 500) {
+      data = { message: 'O backend retornou uma resposta invalida ao processar a solicitacao.' };
+    } else if (text) {
+      data = { message: text.slice(0, 220) };
+    } else {
+      data = { message: 'Resposta invalida do servidor.' };
+    }
+  }
 
   if (!response.ok) {
     throw new Error(data.message || 'Erro na requisicao');
