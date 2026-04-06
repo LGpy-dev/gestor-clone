@@ -37,6 +37,32 @@ router.get('/', auth, permit('super', 'adm', 'user'), async (req, res) => {
   res.json(users);
 });
 
+router.get('/by-cpf/:cpf', auth, permit('super', 'adm', 'user'), async (req, res) => {
+  try {
+    const normalizedCpf = normalizeCpf(req.params.cpf);
+
+    if (!isValidCpfFormat(normalizedCpf)) {
+      return res.status(400).json({ message: 'Informe um CPF valido' });
+    }
+
+    const query = req.user.role === 'user'
+      ? { _id: req.user.id, cpf: normalizedCpf, role: { $ne: 'super' } }
+      : { cpf: normalizedCpf, role: { $ne: 'super' } };
+
+    const user = await User.findOne(query)
+      .select('-passwordHash')
+      .sort({ updatedAt: -1, createdAt: -1 });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario nao encontrado' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar usuario', error: error.message });
+  }
+});
+
 router.post('/', auth, permit('super', 'adm'), async (req, res) => {
   try {
     const { name, cpf, email, password, role } = req.body;
@@ -163,10 +189,7 @@ router.put('/:id/bg-publications', auth, permit('super', 'adm'), async (req, res
       { new: true }
     ).select('-passwordHash');
 
-    res.json({
-      id: user._id,
-      bgPublications: user.bgPublications
-    });
+    res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao atualizar publicacoes de BG', error: error.message });
   }

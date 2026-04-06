@@ -260,12 +260,10 @@ export default function PersonProfilePage() {
       setError('');
 
       try {
-        const data = await request('/users');
+        const matched = await request(`/users/by-cpf/${normalizedTargetCpf}`);
         if (!active) {
           return;
         }
-
-        const matched = data.find((item) => normalizeCpf(item.cpf) === normalizedTargetCpf);
 
         if (!matched) {
           setError('Pessoa nao encontrada.');
@@ -355,16 +353,13 @@ export default function PersonProfilePage() {
       throw new Error('Nao foi possivel identificar o perfil para salvar as publicacoes.');
     }
 
-    const response = await request(`/users/${person._id}/bg-publications`, {
-      method: 'PUT',
-      body: JSON.stringify({ bgPublications: nextItems })
-    });
+      const response = await request(`/users/${person._id}/bg-publications`, {
+        method: 'PUT',
+        body: JSON.stringify({ bgPublications: nextItems })
+      });
 
-    setPerson((current) => enrichPerson({
-      ...current,
-      bgPublications: response.bgPublications
-    }));
-  }
+      setPerson((current) => enrichPerson(mergePersonData(current, response)));
+    }
 
   async function handleSaveBg() {
     if (!canManageBg) {
