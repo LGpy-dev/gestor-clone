@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from 'primereact/button';
+import { Calendar } from 'primereact/calendar';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
@@ -19,6 +20,12 @@ const EMPTY_BG_FORM = {
   publication: ''
 };
 
+const EMPTY_JUDICIAL_FORM = {
+  _id: '',
+  date: '',
+  description: ''
+};
+
 function normalizeCpf(value) {
   return String(value ?? '').replace(/\D/g, '');
 }
@@ -31,6 +38,66 @@ function formatCpf(value) {
   }
 
   return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+function parseBrazilianDate(value) {
+  const match = String(value ?? '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  if (!match) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const [, day, month, year] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+}
+
+function parseBrazilianDateToDate(value) {
+  const match = String(value ?? '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, day, month, year] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateToBrazilian(value) {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return '';
+  }
+
+  const day = String(value.getDate()).padStart(2, '0');
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const year = value.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function sortItemsByDate(items = []) {
+  return [...items].sort((left, right) => parseBrazilianDate(right.date) - parseBrazilianDate(left.date));
+}
+
+function sortBgPublications(items = []) {
+  return sortItemsByDate(items);
+}
+
+function sortJudicialPendencies(items = []) {
+  return sortItemsByDate(items);
+}
+
+function formatBulletinNumber(value) {
+  return String(value ?? '')
+    .replace(/^bg\s*(n[oÂºÂ°.]*)?\s*/i, '')
+    .trim();
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 }
 
 function buildMockBgPublications(cpf) {
@@ -55,6 +122,29 @@ function buildMockBgPublications(cpf) {
       return [
         { _id: 'bg-user3-1', date: '09/09/2019', bulletin: 'BG n 173/19', publication: 'DESIGNACAO para coordenacao do Centro de Monitoramento da DITEL em escala extraordinaria.' },
         { _id: 'bg-user3-2', date: '14/04/2022', bulletin: 'BG n 069/22', publication: 'ELOGIO pela atuacao em integracao de imagens e acompanhamento operacional em grande evento.' }
+      ];
+    default:
+      return [];
+  }
+}
+
+function buildMockJudicialPendencies(cpf) {
+  switch (normalizeCpf(cpf)) {
+    case '12345678901':
+      return [
+        { _id: 'jp-adm-1', date: '14/02/2024', description: 'Manifestacao encaminhada a assessoria juridica sobre acompanhamento de processo administrativo disciplinar ja encerrado.' }
+      ];
+    case '12345678902':
+      return [
+        { _id: 'jp-user1-1', date: '03/09/2023', description: 'Registro de comparecimento para prestacao de esclarecimentos em procedimento judicial sem pendencias ativas.' }
+      ];
+    case '12345678903':
+      return [
+        { _id: 'jp-user2-1', date: '19/06/2022', description: 'Anotacao de acompanhamento de oficio judicial para apresentacao de documentos funcionais junto a unidade competente.' }
+      ];
+    case '12345678904':
+      return [
+        { _id: 'jp-user3-1', date: '28/11/2021', description: 'Controle interno de resposta a requisicao judicial referente a relatorio tecnico de operacao concluida.' }
       ];
     default:
       return [];
@@ -89,13 +179,20 @@ function enrichPerson(person) {
     healthPlan: person.healthPlan || '',
     subJudice: person.subJudice || '',
     bgPublications: Array.isArray(person.bgPublications) && person.bgPublications.length > 0
-      ? person.bgPublications.map((item, index) => ({
+      ? sortBgPublications(person.bgPublications.map((item, index) => ({
         _id: item._id || `bg-${index + 1}`,
         date: item.date || '',
         bulletin: item.bulletin || '',
         publication: item.publication || ''
-      }))
-      : buildMockBgPublications(person.cpf),
+      })))
+      : sortBgPublications(buildMockBgPublications(person.cpf)),
+    judicialPendencies: Array.isArray(person.judicialPendencies) && person.judicialPendencies.length > 0
+      ? sortJudicialPendencies(person.judicialPendencies.map((item, index) => ({
+        _id: item._id || `judicial-${index + 1}`,
+        date: item.date || '',
+        description: item.description || ''
+      })))
+      : sortJudicialPendencies(buildMockJudicialPendencies(person.cpf)),
     unitPlacement: person.unitPlacement || '',
     activityUnit: person.activityUnit || '',
     duty: person.duty || '',
@@ -165,6 +262,15 @@ function AddIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg className="gestor-profile-mini-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="5.8" fill="none" stroke="currentColor" strokeWidth="2.2" />
+      <path d="m15.5 15.5 4 4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function ViewIcon() {
   return (
     <svg className="gestor-profile-mini-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -225,6 +331,8 @@ export default function PersonProfilePage() {
   const location = useLocation();
   const { personCpf } = useParams();
   const toast = useRef(null);
+  const bgSearchInputRef = useRef(null);
+  const judicialSearchInputRef = useRef(null);
   const [person, setPerson] = useState(() => (location.state?.person ? enrichPerson(location.state.person) : null));
   const [loading, setLoading] = useState(!location.state?.person);
   const [error, setError] = useState('');
@@ -234,22 +342,69 @@ export default function PersonProfilePage() {
     functional: false
   });
   const [functionalPanelsOpen, setFunctionalPanelsOpen] = useState({
-    other: false
+    other: false,
+    judicial: false
   });
   const [bgDialogOpen, setBgDialogOpen] = useState(false);
   const [bgDialogMode, setBgDialogMode] = useState('view');
   const [bgForm, setBgForm] = useState(EMPTY_BG_FORM);
   const [bgSaving, setBgSaving] = useState(false);
+  const [bgSearch, setBgSearch] = useState('');
+  const [judicialDialogOpen, setJudicialDialogOpen] = useState(false);
+  const [judicialDialogMode, setJudicialDialogMode] = useState('view');
+  const [judicialForm, setJudicialForm] = useState(EMPTY_JUDICIAL_FORM);
+  const [judicialSaving, setJudicialSaving] = useState(false);
+  const [judicialSearch, setJudicialSearch] = useState('');
   const queryMode = useMemo(() => new URLSearchParams(location.search).get('mode'), [location.search]);
   const pageMode = queryMode === 'edit' ? 'edit' : 'view';
   const canManageBg = (user?.role === 'super' || user?.role === 'adm') && pageMode === 'edit';
   const bgPublications = Array.isArray(person?.bgPublications) ? person.bgPublications : [];
+  const judicialPendencies = Array.isArray(person?.judicialPendencies) ? person.judicialPendencies : [];
+  const filteredBgPublications = useMemo(() => {
+    const query = normalizeSearchText(bgSearch);
+
+    if (!query) {
+      return bgPublications;
+    }
+
+    return bgPublications.filter((item) => {
+      const haystack = normalizeSearchText([
+        item.date,
+        formatBulletinNumber(item.bulletin),
+        item.publication
+      ].join(' '));
+
+      return haystack.includes(query);
+    });
+  }, [bgPublications, bgSearch]);
+  const filteredJudicialPendencies = useMemo(() => {
+    const query = normalizeSearchText(judicialSearch);
+
+    if (!query) {
+      return judicialPendencies;
+    }
+
+    return judicialPendencies.filter((item) => {
+      const haystack = normalizeSearchText([
+        item.date,
+        item.description
+      ].join(' '));
+
+      return haystack.includes(query);
+    });
+  }, [judicialPendencies, judicialSearch]);
   const isBgDialogReadOnly = bgDialogMode === 'view';
+  const isJudicialDialogReadOnly = judicialDialogMode === 'view';
   const bgDialogTitle = bgDialogMode === 'create'
-    ? 'Adicionar publicacao de BG'
+    ? 'Adicionar publicação de BG'
     : bgDialogMode === 'edit'
-      ? 'Editar publicacao de BG'
-      : 'Visualizar publicacao de BG';
+      ? 'Editar publicação de BG'
+      : 'Visualizar publicação de BG';
+  const judicialDialogTitle = judicialDialogMode === 'create'
+    ? 'Adicionar pendência judicial'
+    : judicialDialogMode === 'edit'
+      ? 'Editar pendência judicial'
+      : 'Visualizar pendência judicial';
 
   useEffect(() => {
     let active = true;
@@ -348,9 +503,41 @@ export default function PersonProfilePage() {
     setBgForm(EMPTY_BG_FORM);
   }
 
+  function openViewJudicial(item) {
+    setJudicialDialogMode('view');
+    setJudicialForm({
+      _id: item._id || '',
+      date: item.date || '',
+      description: item.description || ''
+    });
+    setJudicialDialogOpen(true);
+  }
+
+  function openEditJudicial(item) {
+    setJudicialDialogMode('edit');
+    setJudicialForm({
+      _id: item._id || '',
+      date: item.date || '',
+      description: item.description || ''
+    });
+    setJudicialDialogOpen(true);
+  }
+
+  function openCreateJudicial() {
+    setJudicialDialogMode('create');
+    setJudicialForm(EMPTY_JUDICIAL_FORM);
+    setJudicialDialogOpen(true);
+  }
+
+  function closeJudicialDialog() {
+    setJudicialDialogOpen(false);
+    setJudicialDialogMode('view');
+    setJudicialForm(EMPTY_JUDICIAL_FORM);
+  }
+
   async function persistBgPublications(nextItems) {
     if (!person?._id) {
-      throw new Error('Nao foi possivel identificar o perfil para salvar as publicacoes.');
+      throw new Error('Não foi possível identificar o perfil para salvar as publicações.');
     }
 
       const response = await request(`/users/${person._id}/bg-publications`, {
@@ -361,19 +548,32 @@ export default function PersonProfilePage() {
       setPerson((current) => enrichPerson(mergePersonData(current, response)));
     }
 
+  async function persistJudicialPendencies(nextItems) {
+    if (!person?._id) {
+      throw new Error('Não foi possível identificar o perfil para salvar as pendências.');
+    }
+
+    const response = await request(`/users/${person._id}/judicial-pendencies`, {
+      method: 'PUT',
+      body: JSON.stringify({ judicialPendencies: nextItems })
+    });
+
+    setPerson((current) => enrichPerson(mergePersonData(current, response)));
+  }
+
   async function handleSaveBg() {
     if (!canManageBg) {
       return;
     }
 
-    if (!bgForm.date.trim() || !bgForm.bulletin.trim() || !bgForm.publication.trim()) {
-      toast.current?.show({
-        severity: 'warn',
-        summary: 'Campos obrigatorios',
-        detail: 'Informe data, BG e publicacao antes de salvar.',
-        life: TOAST_LIFE
-      });
-      return;
+      if (!bgForm.date.trim() || !bgForm.publication.trim()) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Campos obrigatórios',
+          detail: 'Informe a data e a publicação antes de salvar.',
+          life: TOAST_LIFE
+        });
+        return;
     }
 
     setBgSaving(true);
@@ -387,28 +587,78 @@ export default function PersonProfilePage() {
         publication: bgForm.publication.trim()
       };
 
-      const nextItems = bgForm._id
+      const nextItems = sortBgPublications(bgForm._id
         ? currentItems.map((item) => (String(item._id) === String(bgForm._id) ? nextItem : item))
-        : [...currentItems, nextItem];
+        : [...currentItems, nextItem]);
 
       await persistBgPublications(nextItems);
       closeBgDialog();
       setFunctionalPanelsOpen((current) => ({ ...current, other: true }));
+        toast.current?.show({
+          severity: 'success',
+          summary: bgForm._id ? 'Informação atualizada' : 'Informação adicionada',
+          detail: bgForm._id ? 'O registro foi atualizado.' : 'O registro foi adicionado.',
+          life: TOAST_SUCCESS_LIFE
+        });
+      } catch (saveError) {
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Falha ao salvar',
+          detail: saveError.message || 'Não foi possível salvar a publicação.',
+          life: TOAST_LIFE
+        });
+    } finally {
+      setBgSaving(false);
+    }
+  }
+
+  async function handleSaveJudicial() {
+    if (!canManageBg) {
+      return;
+    }
+
+    if (!judicialForm.date.trim() || !judicialForm.description.trim()) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Campos obrigatórios',
+        detail: 'Informe a data e a pendência antes de salvar.',
+        life: TOAST_LIFE
+      });
+      return;
+    }
+
+    setJudicialSaving(true);
+
+    try {
+      const currentItems = Array.isArray(person?.judicialPendencies) ? person.judicialPendencies : [];
+      const nextItem = {
+        _id: judicialForm._id || `temp-judicial-${Date.now()}`,
+        date: judicialForm.date.trim(),
+        description: judicialForm.description.trim()
+      };
+
+      const nextItems = sortJudicialPendencies(judicialForm._id
+        ? currentItems.map((item) => (String(item._id) === String(judicialForm._id) ? nextItem : item))
+        : [...currentItems, nextItem]);
+
+      await persistJudicialPendencies(nextItems);
+      closeJudicialDialog();
+      setFunctionalPanelsOpen((current) => ({ ...current, judicial: true }));
       toast.current?.show({
         severity: 'success',
-        summary: bgForm._id ? 'BG atualizado' : 'BG cadastrado',
-        detail: bgForm._id ? 'A publicacao foi atualizada.' : 'A publicacao foi adicionada.',
+        summary: judicialForm._id ? 'Informação atualizada' : 'Informação adicionada',
+        detail: judicialForm._id ? 'O registro foi atualizado.' : 'O registro foi adicionado.',
         life: TOAST_SUCCESS_LIFE
       });
     } catch (saveError) {
       toast.current?.show({
         severity: 'error',
         summary: 'Falha ao salvar',
-        detail: saveError.message || 'Nao foi possivel salvar a publicacao.',
+        detail: saveError.message || 'Não foi possível salvar a pendência judicial.',
         life: TOAST_LIFE
       });
     } finally {
-      setBgSaving(false);
+      setJudicialSaving(false);
     }
   }
 
@@ -418,8 +668,9 @@ export default function PersonProfilePage() {
     }
 
     confirmDialog({
-      message: 'Deseja excluir esta publicacao?',
-      header: 'Confirmar exclusao',
+      message: 'Deseja excluir esta publicação?',
+      header: 'Confirmar exclusão',
+      className: 'gestor-confirm-delete-dialog',
       acceptLabel: 'Excluir',
       rejectLabel: 'Cancelar',
       acceptClassName: 'p-button-danger',
@@ -430,15 +681,50 @@ export default function PersonProfilePage() {
           await persistBgPublications(nextItems);
           toast.current?.show({
             severity: 'error',
-            summary: 'Publicacao removida',
-            detail: 'O registro foi excluido.',
+            summary: 'Informação removida',
+             detail: 'O registro foi removido.',
             life: TOAST_SUCCESS_LIFE
           });
         } catch (deleteError) {
           toast.current?.show({
             severity: 'error',
             summary: 'Falha ao excluir',
-            detail: deleteError.message || 'Nao foi possivel excluir a publicacao.',
+            detail: deleteError.message || 'Não foi possível excluir a publicação.',
+            life: TOAST_LIFE
+          });
+        }
+      }
+    });
+  }
+
+  function handleDeleteJudicial(item) {
+    if (!canManageBg) {
+      return;
+    }
+
+    confirmDialog({
+      message: 'Deseja excluir esta pendência judicial?',
+      header: 'Confirmar exclusão',
+      className: 'gestor-confirm-delete-dialog',
+      acceptLabel: 'Excluir',
+      rejectLabel: 'Cancelar',
+      acceptClassName: 'p-button-danger',
+      accept: async () => {
+        try {
+          const currentItems = Array.isArray(person?.judicialPendencies) ? person.judicialPendencies : [];
+          const nextItems = currentItems.filter((judicialItem) => String(judicialItem._id) !== String(item._id));
+          await persistJudicialPendencies(nextItems);
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Informação removida',
+            detail: 'O registro foi removido.',
+            life: TOAST_SUCCESS_LIFE
+          });
+        } catch (deleteError) {
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Falha ao excluir',
+            detail: deleteError.message || 'Não foi possível excluir a pendência judicial.',
             life: TOAST_LIFE
           });
         }
@@ -475,7 +761,8 @@ export default function PersonProfilePage() {
     { key: 'service-time', title: 'XVII - TEMPO DE SERVIÇO' },
     { key: 'time-annotations', title: 'XVIII - AVERBAÇÕES DE TEMPO DE SERVIÇO' },
     { key: 'equipment', title: 'XIX - EQUIPAMENTO DE PROTEÇÃO INDIVIDUAL' },
-    { key: 'other', title: 'XX - OUTRAS INFORMAÇÕES' }
+    { key: 'other', title: 'XX - OUTRAS INFORMAÇÕES' },
+    { key: 'judicial', title: 'XXI - PENDÊNCIAS JUDICIAIS' }
   ];
 
   return (
@@ -528,8 +815,8 @@ export default function PersonProfilePage() {
                   <p><strong>CPF:</strong> {formatCpf(person.cpf)}</p>
                   <p><strong>RG/CIVIL:</strong> {person.civilRg}</p>
                   <p><strong>CNH:</strong> {person.cnh} <strong>Categoria:</strong> {person.cnhCategory} <strong>Validade:</strong> {person.cnhValidity}</p>
-                  <p><strong>Cartao SUS:</strong> {person.susCard}</p>
-                  <p><strong>Titulo de eleitor:</strong> {person.voterTitle} <strong>Zona:</strong> {person.voterZone} <strong>Secao:</strong> {person.voterSection}</p>
+                  <p><strong>Cartão SUS:</strong> {person.susCard}</p>
+                  <p><strong>Título de eleitor:</strong> {person.voterTitle} <strong>Zona:</strong> {person.voterZone} <strong>Seção:</strong> {person.voterSection}</p>
                   <p><strong>Data de nascimento:</strong> {person.birthDate}</p>
                   <p><strong>Naturalidade:</strong> {person.birthPlace}</p>
                   <p><strong>Nacionalidade:</strong> {person.nationality}</p>
@@ -537,14 +824,14 @@ export default function PersonProfilePage() {
 
                 <div className="gestor-profile-summary-column">
                   <p><strong>Estado civil:</strong> {person.civilStatus}</p>
-                  <p><strong>Religiao:</strong> {person.religion}</p>
+                  <p><strong>Religião:</strong> {person.religion}</p>
                   <p><strong>Sexo:</strong> {person.sex}</p>
-                  <p><strong>Cor/raca:</strong> {person.race}</p>
+                  <p><strong>Cor/raça:</strong> {person.race}</p>
                   <p><strong>Escolaridade:</strong> {person.education}</p>
                   <p><strong>Habilidade Profissional:</strong> {person.professionalSkill}</p>
                   <p><strong>Habilidade esportiva:</strong> {person.sportSkill}</p>
-                  <p><strong>Formacao superior:</strong> {person.higherEducation}</p>
-                  <p><strong>Plano de saude:</strong> {person.healthPlan}</p>
+                  <p><strong>Formação superior:</strong> {person.higherEducation}</p>
+                  <p><strong>Plano de saúde:</strong> {person.healthPlan}</p>
                   <p><strong>Sub judice:</strong> {person.subJudice}</p>
                 </div>
               </div>
@@ -580,7 +867,7 @@ export default function PersonProfilePage() {
                   {sectionsOpen.functional && (
                   <div className="gestor-profile-section-body gestor-profile-section-body-nested">
                       {functionalSubsections.map((section) => {
-                        if (section.key !== 'other') {
+                        if (section.key !== 'other' && section.key !== 'judicial') {
                           return (
                             <article key={section.key} className="gestor-profile-subsection is-mock">
                               <div className="gestor-profile-subsection-header is-mock">
@@ -591,54 +878,72 @@ export default function PersonProfilePage() {
                           );
                         }
 
-                        const isOpen = functionalPanelsOpen.other;
+                        if (section.key === 'other') {
+                          const isOpen = functionalPanelsOpen.other;
 
-                        return (
-                          <article key={section.key} className={`gestor-profile-subsection gestor-profile-subsection-toggle ${isOpen ? 'is-open' : ''}`}>
-                            <button
-                              type="button"
-                              className="gestor-profile-subsection-header gestor-profile-subsection-button"
-                              onClick={() => toggleFunctionalPanel('other')}
-                            >
-                              <ChevronIcon open={isOpen} />
-                              <span>{section.title}</span>
-                            </button>
+                          return (
+                            <article key={section.key} className={`gestor-profile-subsection gestor-profile-subsection-toggle ${isOpen ? 'is-open' : ''}`}>
+                              <button
+                                type="button"
+                                className="gestor-profile-subsection-header gestor-profile-subsection-button"
+                                onClick={() => toggleFunctionalPanel('other')}
+                              >
+                                <ChevronIcon open={isOpen} />
+                                <span>{section.title}</span>
+                              </button>
 
-                            {isOpen && (
-                              <div className="gestor-profile-subsection-body">
-                                <div className="gestor-bg-mini-crud">
-                                  {canManageBg && (
+                              {isOpen && (
+                                <div className="gestor-profile-subsection-body">
+                                  <div className="gestor-bg-mini-crud">
                                     <div className="gestor-bg-toolbar">
-                                      <Button
-                                        type="button"
-                                        label="Adicionar BG"
-                                        icon={<AddIcon />}
-                                        className="gestor-bg-add-button"
-                                        onClick={openCreateBg}
-                                      />
-                                    </div>
-                                  )}
+                                      <div className="gestor-bg-search-shell">
+                                        <InputText
+                                          ref={bgSearchInputRef}
+                                          value={bgSearch}
+                                          onChange={(event) => setBgSearch(event.target.value)}
+                                          className="gestor-bg-search-input"
+                                          placeholder="Consulte por nome"
+                                        />
+                                        <button
+                                          type="button"
+                                          className="gestor-bg-search-button"
+                                          onClick={() => bgSearchInputRef.current?.focus()}
+                                          aria-label="Pesquisar publicação"
+                                        >
+                                          <SearchIcon />
+                                        </button>
+                                      </div>
+                                      {canManageBg && (
+                                        <Button
+                                          type="button"
+                                          label="Adicionar"
+                                          icon={<AddIcon />}
+                                          className="gestor-bg-add-button"
+                                          onClick={openCreateBg}
+                                        />
+                                      )}
+                                  </div>
 
-                                  {bgPublications.length > 0 ? (
+                                  {filteredBgPublications.length > 0 ? (
                                     <div className="gestor-bg-list">
-                                      {bgPublications.map((item) => (
+                                      {filteredBgPublications.map((item) => (
                                         <article key={item._id} className="gestor-bg-card">
                                           <div className="gestor-bg-card-copy">
-                                            <p><strong>Data:</strong> {item.date}</p>
-                                            <p><strong>BG:</strong> {item.bulletin}</p>
-                                            <p><strong>Publicacao:</strong> {item.publication}</p>
+                                            <div className="gestor-bg-card-top">
+                                              <div className="gestor-bg-meta">
+                                                <strong>DATA:</strong>
+                                                <span>{item.date}</span>
+                                              </div>
+                                            </div>
+
+                                            <div className="gestor-bg-card-publication">
+                                              <strong>PUBLICAÇÃO:</strong>
+                                              <p>{item.publication}</p>
+                                            </div>
                                           </div>
 
                                           <div className="gestor-bg-card-actions">
-                                            <Button
-                                              type="button"
-                                              label="Visualizar"
-                                              icon={<ViewIcon />}
-                                              className="gestor-bg-card-button gestor-bg-card-button-view"
-                                              onClick={() => openViewBg(item)}
-                                            />
-
-                                            {canManageBg && (
+                                            {canManageBg ? (
                                               <>
                                                 <Button
                                                   type="button"
@@ -656,6 +961,14 @@ export default function PersonProfilePage() {
                                                   onClick={() => handleDeleteBg(item)}
                                                 />
                                               </>
+                                            ) : (
+                                              <Button
+                                                type="button"
+                                                label="Visualizar"
+                                                icon={<ViewIcon />}
+                                                className="gestor-bg-card-button gestor-bg-card-button-view"
+                                                onClick={() => openViewBg(item)}
+                                              />
                                             )}
                                           </div>
                                         </article>
@@ -663,7 +976,118 @@ export default function PersonProfilePage() {
                                     </div>
                                   ) : (
                                     <div className="gestor-bg-empty">
-                                      Nenhuma publicacao de BG cadastrada para este perfil.
+                                      {bgSearch.trim()
+                                        ? 'Nenhuma publicação encontrada para a busca informada.'
+                                        : 'Nenhuma publicação de BG cadastrada para este perfil.'}
+                                    </div>
+                                  )}
+                                </div>
+                                </div>
+                              )}
+                            </article>
+                          );
+                        }
+
+                        const isOpen = functionalPanelsOpen.judicial;
+
+                        return (
+                          <article key={section.key} className={`gestor-profile-subsection gestor-profile-subsection-toggle ${isOpen ? 'is-open' : ''}`}>
+                            <button
+                              type="button"
+                              className="gestor-profile-subsection-header gestor-profile-subsection-button"
+                              onClick={() => toggleFunctionalPanel('judicial')}
+                            >
+                              <ChevronIcon open={isOpen} />
+                              <span>{section.title}</span>
+                            </button>
+
+                            {isOpen && (
+                              <div className="gestor-profile-subsection-body">
+                                <div className="gestor-bg-mini-crud">
+                                  <div className="gestor-bg-toolbar">
+                                    <div className="gestor-bg-search-shell">
+                                      <InputText
+                                        ref={judicialSearchInputRef}
+                                        value={judicialSearch}
+                                        onChange={(event) => setJudicialSearch(event.target.value)}
+                                        className="gestor-bg-search-input"
+                                        placeholder="Consulte por pendência"
+                                      />
+                                      <button
+                                        type="button"
+                                        className="gestor-bg-search-button"
+                                        onClick={() => judicialSearchInputRef.current?.focus()}
+                                        aria-label="Pesquisar pendência judicial"
+                                      >
+                                        <SearchIcon />
+                                      </button>
+                                    </div>
+                                    {canManageBg && (
+                                      <Button
+                                        type="button"
+                                        label="Adicionar"
+                                        icon={<AddIcon />}
+                                        className="gestor-bg-add-button"
+                                        onClick={openCreateJudicial}
+                                      />
+                                    )}
+                                  </div>
+
+                                  {filteredJudicialPendencies.length > 0 ? (
+                                    <div className="gestor-bg-list">
+                                      {filteredJudicialPendencies.map((item) => (
+                                        <article key={item._id} className="gestor-bg-card">
+                                          <div className="gestor-bg-card-copy">
+                                            <div className="gestor-bg-card-top">
+                                              <div className="gestor-bg-meta">
+                                                <strong>DATA:</strong>
+                                                <span>{item.date}</span>
+                                              </div>
+                                            </div>
+
+                                            <div className="gestor-bg-card-publication">
+                                              <strong>PENDÊNCIA JUDICIAL:</strong>
+                                              <p>{item.description}</p>
+                                            </div>
+                                          </div>
+
+                                          <div className="gestor-bg-card-actions">
+                                            {canManageBg ? (
+                                              <>
+                                                <Button
+                                                  type="button"
+                                                  label="Editar"
+                                                  icon={<EditIcon />}
+                                                  className="gestor-bg-card-button gestor-bg-card-button-edit"
+                                                  onClick={() => openEditJudicial(item)}
+                                                />
+
+                                                <Button
+                                                  type="button"
+                                                  label="Excluir"
+                                                  icon={<DeleteIcon />}
+                                                  className="gestor-bg-card-button gestor-bg-card-button-delete"
+                                                  onClick={() => handleDeleteJudicial(item)}
+                                                />
+                                              </>
+                                            ) : (
+                                              <Button
+                                                type="button"
+                                                label="Visualizar"
+                                                icon={<ViewIcon />}
+                                                className="gestor-bg-card-button gestor-bg-card-button-view"
+                                                onClick={() => openViewJudicial(item)}
+                                              />
+                                            )}
+                                          </div>
+                                        </article>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="gestor-bg-empty">
+                                      {judicialSearch.trim()
+                                        ? 'Nenhuma pendência encontrada para a busca informada.'
+                                        : 'Nenhuma pendência judicial cadastrada para este perfil.'}
                                     </div>
                                   )}
                                 </div>
@@ -694,36 +1118,30 @@ export default function PersonProfilePage() {
         <div className="gestor-bg-dialog-body">
           <div>
             <label htmlFor="bg-date">Data</label>
-            <InputText
-              id="bg-date"
-              value={bgForm.date}
-              onChange={(event) => setBgForm((current) => ({ ...current, date: event.target.value }))}
-              disabled={isBgDialogReadOnly || bgSaving}
-              placeholder="Ex.: 25/10/2001"
-            />
-          </div>
+            <Calendar
+                id="bg-date"
+                value={parseBrazilianDateToDate(bgForm.date)}
+                onChange={(event) => setBgForm((current) => ({ ...current, date: formatDateToBrazilian(event.value) }))}
+                disabled={isBgDialogReadOnly || bgSaving}
+                dateFormat="dd/mm/yy"
+                showIcon
+                iconDisplay="input"
+                showButtonBar={false}
+                placeholder="Selecione a data"
+                className="gestor-bg-date-calendar"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="bg-bulletin">BG</label>
-            <InputText
-              id="bg-bulletin"
-              value={bgForm.bulletin}
-              onChange={(event) => setBgForm((current) => ({ ...current, bulletin: event.target.value }))}
-              disabled={isBgDialogReadOnly || bgSaving}
-              placeholder="Ex.: BG n 199/01"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="bg-publication">Publicacao</label>
-            <InputTextarea
+            <div>
+              <label htmlFor="bg-publication">Publicação</label>
+              <InputTextarea
               id="bg-publication"
               value={bgForm.publication}
               onChange={(event) => setBgForm((current) => ({ ...current, publication: event.target.value }))}
               disabled={isBgDialogReadOnly || bgSaving}
               rows={6}
               autoResize={false}
-              placeholder="Descreva a publicacao do BG"
+              placeholder="Descreva a publicação do BG"
             />
           </div>
 
@@ -739,9 +1157,69 @@ export default function PersonProfilePage() {
             {!isBgDialogReadOnly && (
               <Button
                 type="button"
-                label={bgDialogMode === 'edit' ? 'Salvar alteracoes' : 'Salvar BG'}
+                label={bgDialogMode === 'edit' ? 'Editar' : 'Adicionar'}
                 onClick={handleSaveBg}
                 loading={bgSaving}
+              />
+            )}
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        visible={judicialDialogOpen}
+        onHide={closeJudicialDialog}
+        header={judicialDialogTitle}
+        className="gestor-bg-dialog"
+        draggable={false}
+        resizable={false}
+        modal
+      >
+        <div className="gestor-bg-dialog-body">
+          <div>
+            <label htmlFor="judicial-date">Data</label>
+            <Calendar
+              id="judicial-date"
+              value={parseBrazilianDateToDate(judicialForm.date)}
+              onChange={(event) => setJudicialForm((current) => ({ ...current, date: formatDateToBrazilian(event.value) }))}
+              disabled={isJudicialDialogReadOnly || judicialSaving}
+              dateFormat="dd/mm/yy"
+              showIcon
+              iconDisplay="input"
+              showButtonBar={false}
+              placeholder="Selecione a data"
+              className="gestor-bg-date-calendar"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="judicial-description">Pendência judicial</label>
+            <InputTextarea
+              id="judicial-description"
+              value={judicialForm.description}
+              onChange={(event) => setJudicialForm((current) => ({ ...current, description: event.target.value }))}
+              disabled={isJudicialDialogReadOnly || judicialSaving}
+              rows={6}
+              autoResize={false}
+              placeholder="Descreva a pendência judicial"
+            />
+          </div>
+
+          <div className="gestor-bg-dialog-actions">
+            <Button
+              type="button"
+              label={isJudicialDialogReadOnly ? 'Fechar' : 'Cancelar'}
+              className="p-button-text"
+              onClick={closeJudicialDialog}
+              disabled={judicialSaving}
+            />
+
+            {!isJudicialDialogReadOnly && (
+              <Button
+                type="button"
+                label={judicialDialogMode === 'edit' ? 'Editar' : 'Adicionar'}
+                onClick={handleSaveJudicial}
+                loading={judicialSaving}
               />
             )}
           </div>
@@ -750,3 +1228,4 @@ export default function PersonProfilePage() {
     </GestorPortalLayout>
   );
 }
+

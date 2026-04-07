@@ -1,4 +1,5 @@
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const SESSION_EXPIRED_MESSAGE = 'Sua sessão expirou. Faça login novamente.';
 
 export async function request(path, options = {}) {
   const token = localStorage.getItem('token');
@@ -37,6 +38,18 @@ export async function request(path, options = {}) {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && token && path !== '/auth/login') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('auth-expired-message', SESSION_EXPIRED_MESSAGE);
+        window.dispatchEvent(new Event('auth:expired'));
+      }
+
+      throw new Error(SESSION_EXPIRED_MESSAGE);
+    }
+
     throw new Error(data.message || 'Erro na requisicao');
   }
 

@@ -83,6 +83,22 @@ export default function LoginPage() {
     return () => window.clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const expiredMessage = sessionStorage.getItem('auth-expired-message');
+
+    if (!expiredMessage) {
+      return;
+    }
+
+    sessionStorage.removeItem('auth-expired-message');
+    toast.current?.show({
+      severity: 'warn',
+      summary: 'Sessão expirada',
+      detail: expiredMessage,
+      life: 3600
+    });
+  }, []);
+
   function renderBackgroundSlides(scopeClass = '') {
     return LOGIN_BACKGROUNDS.map((image, index) => (
       <span

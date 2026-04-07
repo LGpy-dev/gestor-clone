@@ -72,6 +72,41 @@ function buildMockBgPublications(cpf) {
   }
 }
 
+function buildMockJudicialPendencies(cpf) {
+  switch (normalizeCpf(cpf)) {
+    case '12345678901':
+      return [
+        {
+          date: '14/02/2024',
+          description: 'Manifestacao encaminhada a assessoria juridica sobre acompanhamento de processo administrativo disciplinar ja encerrado.'
+        }
+      ];
+    case '12345678902':
+      return [
+        {
+          date: '03/09/2023',
+          description: 'Registro de comparecimento para prestacao de esclarecimentos em procedimento judicial sem pendencias ativas.'
+        }
+      ];
+    case '12345678903':
+      return [
+        {
+          date: '19/06/2022',
+          description: 'Anotacao de acompanhamento de oficio judicial para apresentacao de documentos funcionais junto a unidade competente.'
+        }
+      ];
+    case '12345678904':
+      return [
+        {
+          date: '28/11/2021',
+          description: 'Controle interno de resposta a requisicao judicial referente a relatorio tecnico de operacao concluida.'
+        }
+      ];
+    default:
+      return [];
+  }
+}
+
 const seededUsers = [
   {
     name: process.env.SUPER_NAME || 'Dev PMPA',
@@ -368,6 +403,7 @@ async function upsertUsers() {
         healthPlan: item.healthPlan,
         subJudice: item.subJudice,
         bgPublications: buildMockBgPublications(cpf),
+        judicialPendencies: buildMockJudicialPendencies(cpf),
         role: item.role,
         active: item.active
       },

@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { request } from '../services/api';
 
 const AuthContext = createContext(null);
@@ -25,6 +25,15 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('user');
     setUser(null);
   }
+
+  useEffect(() => {
+    function handleAuthExpired() {
+      setUser(null);
+    }
+
+    window.addEventListener('auth:expired', handleAuthExpired);
+    return () => window.removeEventListener('auth:expired', handleAuthExpired);
+  }, []);
 
   const value = useMemo(() => ({ user, login, logout }), [user]);
 

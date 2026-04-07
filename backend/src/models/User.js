@@ -10,6 +10,14 @@ const bgPublicationSchema = new mongoose.Schema(
     { _id: true }
 );
 
+const judicialPendencySchema = new mongoose.Schema(
+    {
+        date: { type: String, trim: true, default: '' },
+        description: { type: String, trim: true, default: '' }
+    },
+    { _id: true }
+);
+
 const userSchema = new mongoose.Schema(
     {
         name: { type: String, required: true, trim: true },
@@ -54,6 +62,7 @@ const userSchema = new mongoose.Schema(
         healthPlan: { type: String, trim: true, default: '' },
         subJudice: { type: String, trim: true, default: '' },
         bgPublications: { type: [bgPublicationSchema], default: [] },
+        judicialPendencies: { type: [judicialPendencySchema], default: [] },
         role: {
             type: String,
             enum: ['super', 'adm', 'user'],

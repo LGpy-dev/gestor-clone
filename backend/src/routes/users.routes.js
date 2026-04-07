@@ -16,13 +16,38 @@ function normalizeBgPublications(items = []) {
     return [];
   }
 
-  return items
+  const normalized = items
     .map((item) => ({
       date: String(item?.date ?? '').trim(),
       bulletin: String(item?.bulletin ?? '').trim(),
       publication: String(item?.publication ?? '').trim()
     }))
     .filter((item) => item.date || item.bulletin || item.publication);
+
+  return normalized.sort((left, right) => {
+    const leftDate = Date.parse(String(left.date).split('/').reverse().join('-')) || 0;
+    const rightDate = Date.parse(String(right.date).split('/').reverse().join('-')) || 0;
+    return rightDate - leftDate;
+  });
+}
+
+function normalizeJudicialPendencies(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  const normalized = items
+    .map((item) => ({
+      date: String(item?.date ?? '').trim(),
+      description: String(item?.description ?? '').trim()
+    }))
+    .filter((item) => item.date || item.description);
+
+  return normalized.sort((left, right) => {
+    const leftDate = Date.parse(String(left.date).split('/').reverse().join('-')) || 0;
+    const rightDate = Date.parse(String(right.date).split('/').reverse().join('-')) || 0;
+    return rightDate - leftDate;
+  });
 }
 
 router.get('/', auth, permit('super', 'adm', 'user'), async (req, res) => {
@@ -192,6 +217,32 @@ router.put('/:id/bg-publications', auth, permit('super', 'adm'), async (req, res
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao atualizar publicacoes de BG', error: error.message });
+  }
+});
+
+router.put('/:id/judicial-pendencies', auth, permit('super', 'adm'), async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Usuario nao encontrado' });
+    }
+
+    if (targetUser.role === 'super') {
+      return res.status(403).json({ message: 'Usuario super nao pode ser alterado pelo CRUD' });
+    }
+
+    const judicialPendencies = normalizeJudicialPendencies(req.body?.judicialPendencies);
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { judicialPendencies },
+      { new: true }
+    ).select('-passwordHash');
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao atualizar pendencias judiciais', error: error.message });
   }
 });
 
